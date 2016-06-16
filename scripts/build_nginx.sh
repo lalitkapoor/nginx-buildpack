@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Build NGINX and modules on Heroku.
 # This program is designed to run in a web dyno provided by Heroku.
 # We would like to build an NGINX binary for the builpack on the
@@ -9,13 +9,17 @@
 # Once the dyno has is 'up' you can open your browser and navigate
 # this dyno's directory structure to download the nginx binary.
 
-NGINX_VERSION=${NGINX_VERSION-1.5.7}
+PATH=$PATH:~/.local/bin
+
+NGINX_VERSION=${NGINX_VERSION-1.9.9}
 PCRE_VERSION=${PCRE_VERSION-8.21}
-HEADERS_MORE_VERSION=${HEADERS_MORE_VERSION-0.23}
+HEADERS_MORE_VERSION=${HEADERS_MORE_VERSION-0.30}
+NEW_RELIC_AGENT_VERSION=${NEW_RELIC_AGENT_VERSION-2.0.0-8}
 
 nginx_tarball_url=http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz
-pcre_tarball_url=http://garr.dl.sourceforge.net/project/pcre/pcre/${PCRE_VERSION}/pcre-${PCRE_VERSION}.tar.bz2
+pcre_tarball_url=http://tenet.dl.sourceforge.net/project/pcre/pcre/${PCRE_VERSION}/pcre-${PCRE_VERSION}.tar.bz2
 headers_more_nginx_module_url=https://github.com/agentzh/headers-more-nginx-module/archive/v${HEADERS_MORE_VERSION}.tar.gz
+new_relic_agent_url=http://nginx.org/packages/ubuntu/pool/nginx/n/nginx-nr-agent/nginx-nr-agent_${NEW_RELIC_AGENT_VERSION}_all.deb
 
 temp_dir=$(mktemp -d /tmp/nginx.XXXXXXXXXX)
 
@@ -35,10 +39,39 @@ echo "Downloading $pcre_tarball_url"
 echo "Downloading $headers_more_nginx_module_url"
 (cd nginx-${NGINX_VERSION} && curl -L $headers_more_nginx_module_url | tar xvz )
 
+echo "Downloading $new_relic_agent_url"
+(
+  cd nginx-${NGINX_VERSION}
+  curl -L -O $new_relic_agent_url
+  dpkg -x nginx-nr-agent_${NEW_RELIC_AGENT_VERSION}_all.deb nr-agent/
+  mkdir /tmp/nginx-nr-agent
+  mv nr-agent/usr/bin/nginx-nr-agent.py /tmp/nginx-nr-agent/
+  sed -i 's/\/dev\/tty/\/dev\/null/g' /tmp/nginx-nr-agent/nginx-nr-agent.py
+
+  # install python tools
+  wget https://bootstrap.pypa.io/ez_setup.py -O - | python - --user
+  wget https://bootstrap.pypa.io/get-pip.py -O - | python - --user
+  pip install --user virtualenv
+
+  # setup virtualenv
+  cd /tmp/nginx-nr-agent
+  virtualenv .env
+  source .env/bin/activate
+
+  # install dependencies for nginx-nr-agent
+  pip install python-daemon
+
+  # package up for downloading
+  cd /tmp
+  tar czvf nginx-nr-agent.tar.gz nginx-nr-agent/
+  mv nginx-nr-agent.tar.gz /tmp/
+)
+
 (
 	cd nginx-${NGINX_VERSION}
 	./configure \
 		--with-pcre=pcre-${PCRE_VERSION} \
+		--with-http_stub_status_module \
 		--prefix=/tmp/nginx \
 		--add-module=/${temp_dir}/nginx-${NGINX_VERSION}/headers-more-nginx-module-${HEADERS_MORE_VERSION}
 	make install

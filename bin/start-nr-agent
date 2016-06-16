@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+erb config/nginx-nr-agent.ini.erb > config/nginx-nr-agent.ini
+
+touch /tmp/nginx-nr-agent.log
+source nginx-nr-agent/.env/bin/activate
+./nginx-nr-agent/.env/bin/python nginx-nr-agent/nginx-nr-agent.py -f -c config/nginx-nr-agent.ini start

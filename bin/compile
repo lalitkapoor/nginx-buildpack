@@ -20,4 +20,16 @@ if [[ ! -f $1/config/nginx.conf.erb ]]; then
 else
 	echo '-----> nginx-buildpack: Custom config found in app/config.'
 fi
+
+
+tar -zxf nginx-nr-agent.tar.gz --directory "$1"
+cp "bin/start-nr-agent" "$1/bin/start-nr-agent"
+
+if [[ ! -f $1/config/nginx-nr-agent.ini.erb ]]; then
+  cp config/nginx-nr-agent.ini.erb "$1/config/"
+  echo '-----> nginx-buildpack: Default nr config copied to app/config.'
+else
+  echo '-----> nginx-buildpack: Custom nr config found in app/config.'
+fi
+
 exit 0
