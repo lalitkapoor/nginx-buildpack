@@ -70,6 +70,7 @@ echo "Downloading $new_relic_agent_url"
 (
 	cd nginx-${NGINX_VERSION}
 	./configure \
+    --with-http_perl_module \
 		--with-pcre=pcre-${PCRE_VERSION} \
 		--with-http_stub_status_module \
 		--prefix=/tmp/nginx \
